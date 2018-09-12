@@ -1,39 +1,50 @@
 /*
 This file is part of Telegram Desktop,
-the official desktop version of Telegram messaging app, see https://telegram.org
+the official desktop application for the Telegram messaging service.
 
-Telegram Desktop is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-It is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
-
-In addition, as a special exception, the copyright holders give permission
-to link the code of portions of this program with the OpenSSL library.
-
-Full license: https://github.com/telegramdesktop/tdesktop/blob/master/LICENSE
-Copyright (c) 2014-2016 John Preston, https://desktop.telegram.org
+For license and copyright information please follow this link:
+https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
-#include "stdafx.h"
-
 #include "mtproto/rpc_sender.h"
 
+RPCError::RPCError(const MTPrpcError &error)
+: _code(error.c_rpc_error().verror_code.v) {
+	QString text = qs(error.c_rpc_error().verror_message);
+	if (_code < 0 || _code >= 500) {
+		_type = qsl("INTERNAL_SERVER_ERROR");
+		_description = text;
+	} else {
+		const auto expression = QRegularExpression(
+			"^([A-Z0-9_]+)(: .*)?$",
+			reMultiline);
+		const auto match = expression.match(text);
+		if (match.hasMatch()) {
+			_type = match.captured(1);
+			_description = match.captured(2).mid(2);
+		} else {
+			_type = qsl("CLIENT_BAD_RPC_ERROR");
+			_description = qsl("Bad rpc error received, text = '") + text + '\'';
+		}
+	}
+}
+
+
 RPCOwnedDoneHandler::RPCOwnedDoneHandler(RPCSender *owner) : _owner(owner) {
-	_owner->_rpcRegHandler(this);
+	_owner->rpcRegHandler(this);
 }
 
 RPCOwnedDoneHandler::~RPCOwnedDoneHandler() {
-	if (_owner) _owner->_rpcUnregHandler(this);
+	if (_owner) {
+		_owner->rpcUnregHandler(this);
+	}
 }
 
 RPCOwnedFailHandler::RPCOwnedFailHandler(RPCSender *owner) : _owner(owner) {
-	_owner->_rpcRegHandler(this);
+	_owner->rpcRegHandler(this);
 }
 
 RPCOwnedFailHandler::~RPCOwnedFailHandler() {
-	if (_owner) _owner->_rpcUnregHandler(this);
+	if (_owner) {
+		_owner->rpcUnregHandler(this);
+	}
 }

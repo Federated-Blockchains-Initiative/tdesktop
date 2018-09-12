@@ -1,22 +1,9 @@
 /*
 This file is part of Telegram Desktop,
-the official desktop version of Telegram messaging app, see https://telegram.org
+the official desktop application for the Telegram messaging service.
 
-Telegram Desktop is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-It is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
-
-In addition, as a special exception, the copyright holders give permission
-to link the code of portions of this program with the OpenSSL library.
-
-Full license: https://github.com/telegramdesktop/tdesktop/blob/master/LICENSE
-Copyright (c) 2014-2016 John Preston, https://desktop.telegram.org
+For license and copyright information please follow this link:
+https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 
 #define NOMINMAX // no min() and max() macro declarations
@@ -37,39 +24,79 @@ Copyright (c) 2014-2016 John Preston, https://desktop.telegram.org
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-stack-address"
-#endif // __clang__
+#elif defined _MSC_VER && _MSC_VER >= 1914 // __clang__
+#pragma warning(push)
+#pragma warning(disable:4180)
+#endif // __clang__ || _MSC_VER >= 1914
 
 #include <QtCore/QtCore>
 
 #ifdef __clang__
 #pragma clang diagnostic pop
-#endif // __clang__
+#elif defined _MSC_VER && _MSC_VER >= 1914 // __clang__
+#pragma warning(pop)
+#endif // __clang__ || _MSC_VER >= 1914
 
+#if QT_VERSION < QT_VERSION_CHECK(5, 5, 0)
+#define OS_MAC_OLD
+#endif // QT_VERSION < 5.5.0
+
+#ifdef OS_MAC_STORE
+#define MAC_USE_BREAKPAD
+#endif // OS_MAC_STORE
 
 #include <QtWidgets/QtWidgets>
 #include <QtNetwork/QtNetwork>
 
+#include <array>
+#include <vector>
+#include <set>
+#include <map>
+#include <unordered_map>
+#include <unordered_set>
+#include <algorithm>
+#include <memory>
+
+#include <range/v3/all.hpp>
+#ifdef Q_OS_WIN
+#include "platform/win/windows_range_v3_helpers.h"
+#endif // Q_OS_WIN
+
+// Ensures/Expects.
+#include <gsl/gsl_assert>
+
+// Redefine Ensures/Expects by our own assertions.
+#include "base/assertion.h"
+
+#include <gsl/gsl>
+#include <rpl/rpl.h>
+#include <crl/crl.h>
+
+#include "base/variant.h"
+#include "base/optional.h"
+#include "base/algorithm.h"
+#include "base/flat_set.h"
+#include "base/flat_map.h"
+#include "base/weak_ptr.h"
+
 #include "core/basic_types.h"
+#include "logs.h"
+#include "core/utils.h"
 #include "config.h"
 
 #include "mtproto/facade.h"
 
 #include "ui/style/style_core.h"
-#include "styles/style_basic_types.h"
+#include "styles/palette.h"
 #include "styles/style_basic.h"
 
-#include "ui/twidget.h"
 #include "ui/animation.h"
-#include "ui/flatinput.h"
-#include "ui/flattextarea.h"
-#include "ui/flatbutton.h"
-#include "ui/boxshadow.h"
-#include "ui/popupmenu.h"
-#include "ui/scrollarea.h"
+#include "ui/twidget.h"
 #include "ui/images.h"
 #include "ui/text/text.h"
-#include "ui/flatlabel.h"
 
+#include "data/data_types.h"
 #include "app.h"
+#include "facades.h"
 
 #endif // __cplusplus

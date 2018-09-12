@@ -1,84 +1,102 @@
 /*
 This file is part of Telegram Desktop,
-the official desktop version of Telegram messaging app, see https://telegram.org
+the official desktop application for the Telegram messaging service.
 
-Telegram Desktop is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-It is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
-
-In addition, as a special exception, the copyright holders give permission
-to link the code of portions of this program with the OpenSSL library.
-
-Full license: https://github.com/telegramdesktop/tdesktop/blob/master/LICENSE
-Copyright (c) 2014-2016 John Preston, https://desktop.telegram.org
+For license and copyright information please follow this link:
+https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/flatinput.h"
-#include "ui/scrollarea.h"
-#include "ui/flatbutton.h"
-#include "ui/boxshadow.h"
-#include "boxes/abstractbox.h"
+#include "boxes/abstract_box.h"
+#include "styles/style_widgets.h"
 
 QString findValidCode(QString fullCode);
 
-class CountrySelect;
+namespace Ui {
+class MultiSelect;
+class RippleAnimation;
+} // namespace Ui
 
-class CountryInput : public QWidget {
+class CountryInput : public TWidget {
 	Q_OBJECT
 
 public:
+	CountryInput(QWidget *parent, const style::InputField &st);
 
-	CountryInput(QWidget *parent, const style::countryInput &st);
-
-	void paintEvent(QPaintEvent *e);
-	void mouseMoveEvent(QMouseEvent *e);
-	void mousePressEvent(QMouseEvent *e);
-	void enterEvent(QEvent *e);
-	void leaveEvent(QEvent *e);
-
-	~CountryInput();
+	QString iso() const {
+		return _chosenIso;
+	}
 
 public slots:
-
 	void onChooseCode(const QString &code);
 	bool onChooseCountry(const QString &country);
 
 signals:
-
 	void codeChanged(const QString &code);
 
-private:
+protected:
+	void paintEvent(QPaintEvent *e) override;
+	void mouseMoveEvent(QMouseEvent *e) override;
+	void mousePressEvent(QMouseEvent *e) override;
+	void enterEventHook(QEvent *e) override;
+	void leaveEventHook(QEvent *e) override;
 
+private:
 	void setText(const QString &newText);
 
-	QPixmap _arrow;
-	QRect _inner, _arrowRect;
-	style::countryInput _st;
-	bool _active;
+	const style::InputField &_st;
+	bool _active = false;
 	QString _text;
-
-	CountrySelect *_select;
+	QString _chosenIso;
+	QPainterPath _placeholderPath;
 
 };
 
-class CountrySelectInner : public TWidget {
+class CountrySelectBox : public BoxContent {
 	Q_OBJECT
 
 public:
+	enum class Type {
+		Phones,
+		Countries,
+	};
 
-	CountrySelectInner();
-	void paintEvent(QPaintEvent *e);
-	void enterEvent(QEvent *e);
-	void leaveEvent(QEvent *e);
-	void mouseMoveEvent(QMouseEvent *e);
-	void mousePressEvent(QMouseEvent *e);
+	CountrySelectBox(QWidget*);
+	CountrySelectBox(QWidget*, const QString &iso, Type type);
+
+	static QString NameByISO(const QString &iso);
+	static QString ISOByPhone(const QString &phone);
+
+signals:
+	void countryChosen(const QString &iso);
+
+protected:
+	void prepare() override;
+	void setInnerFocus() override;
+
+	void keyPressEvent(QKeyEvent *e) override;
+	void resizeEvent(QResizeEvent *e) override;
+
+private slots:
+	void onSubmit();
+
+private:
+	void onFilterUpdate(const QString &query);
+
+	Type _type = Type::Phones;
+	object_ptr<Ui::MultiSelect> _select;
+
+	class Inner;
+	QPointer<Inner> _inner;
+
+};
+
+// This class is hold in header because it requires Qt preprocessing.
+class CountrySelectBox::Inner : public TWidget {
+	Q_OBJECT
+
+public:
+	Inner(QWidget *parent, Type type);
 
 	void updateFilter(QString filter = QString());
 
@@ -86,66 +104,40 @@ public:
 	void selectSkipPage(int32 h, int32 dir);
 
 	void chooseCountry();
-	
+
 	void refresh();
 
-signals:
+	~Inner();
 
+signals:
 	void countryChosen(const QString &iso);
 	void mustScrollTo(int ymin, int ymax);
 
-public slots:
-
-	void updateSel();
-
-private:
-
-	void updateSelectedRow();
-
-	int32 _rowHeight;
-
-	int32 _sel;
-	QString _filter;
-	bool _mouseSel;
-
-	QPoint _lastMousePos;
-};
-
-class CountrySelectBox : public ItemListBox {
-	Q_OBJECT
-
-public:
-
-	CountrySelectBox();
-	void keyPressEvent(QKeyEvent *e);
-	void paintEvent(QPaintEvent *e);
-	void resizeEvent(QResizeEvent *e);
-
-	void setInnerFocus() {
-		_filter.setFocus();
-	}
-
-signals:
-
-	void countryChosen(const QString &iso);
-
-public slots:
-
-	void onFilterUpdate();
-	void onFilterCancel();
-	void onSubmit();
-
 protected:
-
-	void showDone();
-	void hideAll();
-	void showAll();
+	void paintEvent(QPaintEvent *e) override;
+	void enterEventHook(QEvent *e) override;
+	void leaveEventHook(QEvent *e) override;
+	void mouseMoveEvent(QMouseEvent *e) override;
+	void mousePressEvent(QMouseEvent *e) override;
+	void mouseReleaseEvent(QMouseEvent *e) override;
 
 private:
+	void updateSelected() {
+		updateSelected(mapFromGlobal(QCursor::pos()));
+	}
+	void updateSelected(QPoint localPos);
+	void updateSelectedRow();
+	void updateRow(int index);
+	void setPressed(int pressed);
 
-	CountrySelectInner _inner;
-	InputField _filter;
-	IconedButton _filterCancel;
+	Type _type = Type::Phones;
+	int _rowHeight = 0;
 
-	ScrollableBoxShadow _topShadow;
+	int _selected = -1;
+	int _pressed = -1;
+	QString _filter;
+	bool _mouseSelection = false;
+
+	std::vector<std::unique_ptr<Ui::RippleAnimation>> _ripples;
+
 };
